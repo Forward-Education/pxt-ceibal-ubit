@@ -13,24 +13,24 @@
 //  shareSensorsWithUBit(channel: number): void
 
 // Display and audio
-fwdUbit.showAndPlayText("hello")
-fwdUbit.showAndPlayNumber(42)
-fwdUbit.playText("world")
+ceibalUbit.showAndPlayText("hello")
+ceibalUbit.showAndPlayNumber(42)
+ceibalUbit.playText("world")
 
 // WiFi
-fwdUbit.connectWifi("my-network", "my-password")
+ceibalUbit.connectWifi("my-network", "my-password")
 
 // Remote sensor connection
-fwdUbit.setupExternalSensors(1)
-fwdUbit.shareSensorsWithUBit(1)
+ceibalUbit.setupExternalSensors(1)
+ceibalUbit.shareSensorsWithUBit(1)
 
 // Remote sensor readings
-const remoteTemp: number = fwdUbit.temperature()
-const remoteLight: number = fwdUbit.lightLevel()
-const remoteSound: number = fwdUbit.soundLevel()
-const remoteHeading: number = fwdUbit.direction()
+const remoteTemp: number = ceibalUbit.temperature()
+const remoteLight: number = ceibalUbit.lightLevel()
+const remoteSound: number = ceibalUbit.soundLevel()
+const remoteHeading: number = ceibalUbit.direction()
 
 // Gesture handler
-fwdUbit.onGestureReceived(Gesture.Shake, function () {
-    fwdUbit.playText("shaken")
+ceibalUbit.onGestureReceived(Gesture.Shake, function () {
+    ceibalUbit.playText("shaken")
 })
