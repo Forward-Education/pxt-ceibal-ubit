@@ -1,0 +1,26 @@
+{
+    "name": "ceibal-ubit",
+    "version": "1.0.0",
+    "description": "This extension supports ubit, an accessibility device for the micro:bit.",
+    "license": "MIT",
+    "dependencies": {
+        "core": "*",
+        "radio": "*",
+        "microphone": "*"
+    },
+    "files": [
+        "README.md",
+        "ubit.ts"
+    ],
+    "testFiles": [
+        "tests/test.ts"
+    ],
+    "targetVersions": {
+        "target": "8.0.22",
+        "targetId": "microbit"
+    },
+    "supportedTargets": [
+        "microbit"
+    ],
+    "preferredEditor": "tsprj"
+}

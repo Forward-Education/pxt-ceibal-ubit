@@ -1,0 +1,33 @@
+name: Run All Tests
+
+on:
+    push:
+        branches:
+            - main
+    pull_request:
+        branches:
+            - main
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.x"
+
+            - name: Install Node.js (if mkc is Node-based)
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "18"
+
+            - name: Install mkc
+              run: npm install -g makecode
+
+            - name: Run PXT Test Script
+              run: python run-all-tests.py

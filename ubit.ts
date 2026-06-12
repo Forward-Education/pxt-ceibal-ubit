@@ -1,0 +1,422 @@
+//% block="UBit"
+//% color=#226F54
+//% icon="\uf29a"
+//% weight=100
+namespace ceibalUbit {
+    let _remoteLight: number = -999 // Variable to store the last received light level
+    let _waitingForLight: boolean = false // Flag to indicate if we are currently waiting for a response
+    let _responseLight: boolean = false // Flag to indicate if a response came back during the wait
+
+    let _remoteTemperature: number = -999 // Variable to store the last received temperature
+    let _waitingForTemperature: boolean = false // Flag to indicate if we are currently waiting for a response
+    let _responseTemperature: boolean = false // Flag to indicate if a response came back during the wait
+
+    let _remoteDirection: number = -999 // Variable to store the last received direction
+    let _waitingForDirection: boolean = false // Flag to indicate if we are currently waiting for a response
+    let _responseDirection: boolean = false // Flag to indicate if a response came back during the wait
+
+    let _remoteSound: number = -999 // Variable to store the last received sound level
+    let _waitingForSound: boolean = false // Flag to indicate if we are currently waiting for a response
+    let _responseSound: boolean = false // Flag to indicate if a response came back during the wait
+
+    // Stores the last received number
+    let lastReceivedNumber = ""
+
+    let BUFF_LEN = 50
+    let I2C_TIME_INTERVAL = 500
+    let col = 0
+    let row = 0
+    let str = ""
+    let StopI2CScreen = 0
+
+    let newLedMatrix = pins.createBuffer(25)
+    let lastLedMatrix = pins.createBuffer(25)
+
+    // Padding function
+    function padEnd(message: string, length: number, char: string) {
+        while (message.length < length) {
+            message = "" + message + char
+        }
+        return message
+    }
+
+    // Transforms string to buffer, pads it, and sends it to the UBit
+    function sendWiFiBuffer(message1: string, message2: string) {
+        // Construct the formatted message with '?' at positions
+        let finalMessage = "?" + message1 + "?" + message2 + "?"
+
+        // Pad the message to BUFF_LEN with spaces
+        finalMessage = padEnd(finalMessage, BUFF_LEN, " ")
+
+        // Create the buffer
+        let buffer2 = pins.createBuffer(BUFF_LEN)
+        for (let i = 0; i < BUFF_LEN; i++) {
+            buffer2.setNumber(
+                NumberFormat.UInt8LE,
+                i,
+                finalMessage.charCodeAt(i),
+            )
+        }
+
+        // Send buffer via I2C
+        pins.i2cWriteBuffer(7, buffer2, false)
+    }
+
+    // Transforms string to buffer, pads it, and sends it to the UBit
+    function sendTextBuffer(message: string) {
+        // Ensure the message does not exceed BUFF_LEN - 1 to make space for '%'
+        if (message.length > BUFF_LEN - 1) {
+            message = message.slice(0, BUFF_LEN - 1)
+        }
+
+        // Add '%' at the start and shift the message
+        message = "%" + message + "%"
+
+        // Pad the message to BUFF_LEN with spaces
+        message = padEnd(message, BUFF_LEN, " ")
+
+        let buffer2 = pins.createBuffer(BUFF_LEN)
+        for (let i = 0; i < BUFF_LEN; i++) {
+            buffer2.setNumber(NumberFormat.UInt8LE, i, message.charCodeAt(i))
+        }
+
+        // Send buffer via I2C
+        pins.i2cWriteBuffer(7, buffer2, false)
+    }
+
+    function copyBuffer(original: Buffer): Buffer {
+        let copy = pins.createBuffer(original.length)
+        copy.write(0, original)
+        return copy
+    }
+
+    function isAllZero(buffer: Buffer) {
+        // Iterates through the buffer and returns true if all values are 0
+        for (let i = 0; i < buffer.length; i++) {
+            if (buffer[i] !== 0) {
+                return false // If a non-zero value is found, return false
+            }
+        }
+        return true // If all values are 0, return true
+    }
+
+    // Transforms the string to buffer, pads it, and sends it to the UBit.
+    // Ensures the first character is # as it is an icon.
+    function sendIconBuffer() {
+        let LedMatrix = pins.createBuffer(25)
+        let buffer2 = pins.createBuffer(BUFF_LEN)
+
+        for (let i = 0; i <= 24; i++) {
+            row = Math.floor(i / 5)
+            col = i % 5
+            LedMatrix.setNumber(
+                NumberFormat.UInt8LE,
+                i,
+                led.point(row, col) ? 1 : 0,
+            )
+        }
+
+        if (!LedMatrix.equals(lastLedMatrix) || isAllZero(LedMatrix)) {
+            lastLedMatrix = copyBuffer(LedMatrix)
+            return
+        }
+
+        // Place '#' at the first position
+        buffer2.setNumber(NumberFormat.UInt8LE, 0, "#".charCodeAt(0))
+
+        // Copy the 25-byte matrixBuffer into buffer2, shifting to the right
+        for (let i = 0; i < 25; i++) {
+            buffer2.setNumber(
+                NumberFormat.UInt8LE,
+                i + 1,
+                LedMatrix.getNumber(NumberFormat.UInt8LE, i),
+            )
+        }
+
+        // Fill the rest with spaces (ASCII 32)
+        for (let i = 26; i < BUFF_LEN; i++) {
+            buffer2.setNumber(NumberFormat.UInt8LE, i, " ".charCodeAt(0))
+        }
+
+        // Send the buffer via I2C
+        pins.i2cWriteBuffer(7, buffer2, false)
+    }
+
+    // Function to handle different messages
+    function handleMessage(msg: string): void {
+        if (msg == "Tem") {
+            radio.sendValue("Tem", input.temperature())
+        } else if (msg == "Lig") {
+            radio.sendValue("Lig", input.lightLevel())
+        } else if (msg == "Sou") {
+            radio.sendValue("Sou", input.soundLevel())
+        } else if (msg == "Dir") {
+            radio.sendValue("Dir", input.compassHeading())
+        } else if (msg == "-1") {
+            radio.sendString("Hello!")
+        }
+    }
+
+    /**
+     * Plays the provided text via audio on the UBit and displays it on the micro:bit.
+     * @param message the text to show and play
+     */
+    //% block="show string $message with audio"
+    //% message.shadow="text"
+    //% blockId=ceibal_ubit_show_and_play_text
+    export function showAndPlayText(message: string): void {
+        StopI2CScreen = 1
+        sendTextBuffer(message)
+        basic.showString(message)
+        StopI2CScreen = 0
+    }
+
+    /**
+     * Plays the provided number via audio on the UBit and displays it on the micro:bit.
+     * @param message the number to show and play
+     */
+    //% block="show number $message with audio"
+    //% blockId=ceibal_ubit_show_and_play_number
+    export function showAndPlayNumber(message: number): void {
+        let textString = message.toString()
+        StopI2CScreen = 1
+        sendTextBuffer(textString)
+        basic.showString(textString)
+        StopI2CScreen = 0
+    }
+
+    /**
+     * Plays the provided text via audio on the UBit.
+     * @param message the text to play
+     */
+    //% block="play $message via audio"
+    //% message.shadow="text"
+    //% blockId=ceibal_ubit_play_text
+    export function playText(message: string): void {
+        StopI2CScreen = 1
+        sendTextBuffer(message)
+        StopI2CScreen = 0
+    }
+
+    /**
+     * Connects the UBit to the provided WiFi network.
+     * @param wifi the name of the WiFi network
+     * @param password the password of the WiFi network
+     */
+    //% block="connect to network $wifi with password $password"
+    //% blockId=ceibal_ubit_connect_wifi
+    export function connectWifi(wifi: string, password: string): void {
+        StopI2CScreen = 1
+        sendWiFiBuffer(wifi, password)
+        StopI2CScreen = 0
+        str = ""
+    }
+
+    // This functionality is not supported by the firmware and has been cut from the requirements
+    //
+    // Enables/disables audio output for the
+    // icons shown on the micro:bit display.
+    //
+    // block="Enable icons with audio $yes"
+    // yes.shadow="toggleOnOff"
+    // export function Icon(yes: boolean) {
+    //     if (yes) {
+    //         loops.everyInterval(I2C_TIME_INTERVAL, function () {
+    //             if (StopI2CScreen == 0) {
+    //                 sendIconBuffer();
+    //             }
+    //         });
+    //     }
+    // }
+
+    /**
+     * Get the temperature from a remote micro:bit.
+     * Requires that a remote connection has been established with the use sensors and share sensors blocks.
+     */
+    //% block="temperature (°C) from external micro:bit"
+    //% blockId=ceibal_ubit_temperature
+    export function temperature(): number {
+        _remoteTemperature = -999
+        _waitingForTemperature = true
+        _responseTemperature = false
+
+        radio.sendString("Tem")
+
+        const startTime = control.millis()
+        const timeout = 1000
+
+        while (control.millis() - startTime < timeout) {
+            if (_responseTemperature) {
+                return _remoteTemperature
+            }
+            basic.pause(20)
+        }
+
+        _waitingForTemperature = false
+        return -999
+    }
+
+    /**
+     * Get the light level from an external micro:bit.
+     * Requires that a remote connection has been established with the use sensors and share sensors blocks.
+     */
+    //% block="light level from external micro:bit"
+    //% blockId=ceibal_ubit_light_level
+    export function lightLevel(): number {
+        _remoteLight = -999
+        _waitingForLight = true
+        _responseLight = false
+
+        radio.sendString("Lig")
+
+        const startTime = control.millis()
+        const timeout = 1000
+
+        while (control.millis() - startTime < timeout) {
+            if (_responseLight) {
+                return _remoteLight
+            }
+            basic.pause(20)
+        }
+
+        _waitingForLight = false
+        return -999
+    }
+
+    /**
+     * Get the sound level from an external micro:bit.
+     * Requires that a remote connection has been established with the use sensors and share sensors blocks.
+     */
+    //% block="sound level from external micro:bit"
+    //% blockId=ceibal_ubit_sound_level
+    export function soundLevel(): number {
+        _remoteSound = -999
+        _waitingForSound = true
+        _responseSound = false
+
+        radio.sendString("Sou")
+
+        const startTime = control.millis()
+        const timeout = 1000
+
+        while (control.millis() - startTime < timeout) {
+            if (_responseSound) {
+                return _remoteSound
+            }
+            basic.pause(20)
+        }
+
+        _waitingForSound = false
+        return -999
+    }
+
+    /**
+     * Get the compass heading from an external micro:bit.
+     * Requires that a remote connection has been established with the use sensors and share sensors blocks.
+     */
+    //% block="compass heading from external micro:bit"
+    //% blockId=ceibal_ubit_direction
+    export function direction(): number {
+        _remoteDirection = -999
+        _waitingForDirection = true
+        _responseDirection = false
+
+        radio.sendString("Dir")
+
+        const startTime = control.millis()
+        const timeout = 1000
+
+        while (control.millis() - startTime < timeout) {
+            if (_responseDirection) {
+                return _remoteDirection
+            }
+            basic.pause(20)
+        }
+
+        _waitingForDirection = false
+        return -999
+    }
+
+    /**
+     * Use sensors from an external micro:bit on the provided radio group.
+     * Both micro:bits need to be using the same radio group to communicate.
+     * Requires that the external micro:bit completes the remote connection with the share sensors block.
+     * @param channel the radio group to communicate on
+     */
+    //% block="use sensors from external micro:bit on radio group $channel"
+    //% channel.min=1 channel.max=255
+    //% blockId=ceibal_ubit_setup_external_sensors
+    export function setupExternalSensors(channel: number): void {
+        radio.setGroup(channel)
+
+        radio.onReceivedValue(function (tag, value) {
+            if (_waitingForLight && tag == "Lig") {
+                _remoteLight = value
+                _responseLight = true
+                _waitingForLight = false
+            }
+            if (_waitingForTemperature && tag == "Tem") {
+                _remoteTemperature = value
+                _responseTemperature = true
+                _waitingForTemperature = false
+            }
+            if (_waitingForDirection && tag == "Dir") {
+                _remoteDirection = value
+                _responseDirection = true
+                _waitingForDirection = false
+            }
+            if (_waitingForSound && tag == "Sou") {
+                _remoteSound = value
+                _responseSound = true
+                _waitingForSound = false
+            }
+        })
+    }
+
+    /**
+     * Executes an action when the provided gesture occurs on the external micro:bit.
+     * Requires that a remote connection has been established with the use sensors and share sensors blocks.
+     * @param gesture the gesture that triggers the action
+     * @param handler the action that is triggered by the gesture
+     */
+    //% block="when external micro:bit is $gesture"
+    //% gesture.defl=Gesture.Shake
+    //% blockId=ceibal_ubit_on_gesture_received
+    export function onGestureReceived(
+        gesture: Gesture,
+        handler: () => void,
+    ): void {
+        control.onEvent(4001, EventBusValue.MICROBIT_EVT_ANY, function () {
+            let receivedGesture = control.eventValue()
+            if (receivedGesture === gesture) {
+                handler()
+            }
+        })
+    }
+
+    /**
+     * Share data from this micro:bit with the UBit micro:bit on the provided radio group.
+     * Both micro:bits need to be using the same radio group to communicate.
+     * Requires that the UBit micro:bit completes the remote connection with the use sensors block.
+     * @param channel the radio group to communicate on
+     */
+    //% block="share sensors with UBit on radio group $channel"
+    //% channel.min=1 channel.max=255
+    //% blockId=ceibal_ubit_share_sensors_with_ubit
+    export function shareSensorsWithUBit(channel: number): void {
+        radio.setGroup(channel)
+
+        radio.onReceivedString(function (msg: string) {
+            handleMessage(msg)
+        })
+
+        control.onEvent(
+            EventBusSource.MICROBIT_ID_GESTURE,
+            EventBusValue.MICROBIT_EVT_ANY,
+            function () {
+                let gesture = control.eventValue()
+                radio.raiseEvent(4001, gesture)
+            },
+        )
+    }
+}
