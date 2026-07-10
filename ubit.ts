@@ -32,6 +32,9 @@ namespace ceibalUbit {
     let newLedMatrix = pins.createBuffer(25)
     let lastLedMatrix = pins.createBuffer(25)
 
+    let _iconAudioEnabled = false // Whether icons on the display are announced via audio
+    let _iconAudioLoopStarted = false // Guards against starting the send loop twice
+
     // Padding function
     function padEnd(message: string, length: number, char: string) {
         while (message.length < length) {
@@ -212,22 +215,27 @@ namespace ceibalUbit {
         str = ""
     }
 
-    // This functionality is not supported by the firmware and has been cut from the requirements
-    //
-    // Enables/disables audio output for the
-    // icons shown on the micro:bit display.
-    //
-    // block="Enable icons with audio $yes"
-    // yes.shadow="toggleOnOff"
-    // export function Icon(yes: boolean) {
-    //     if (yes) {
-    //         loops.everyInterval(I2C_TIME_INTERVAL, function () {
-    //             if (StopI2CScreen == 0) {
-    //                 sendIconBuffer();
-    //             }
-    //         });
-    //     }
-    // }
+    /**
+     * Enables/disables audio output on the UBit for the
+     * icons shown on the micro:bit display.
+     * @param on whether icons are announced via audio
+     */
+    //% block="enable icons with audio $on"
+    //% on.shadow="toggleOnOff"
+    //% blockId=ceibal_ubit_icon_audio
+    export function enableIconAudio(on: boolean): void {
+        _iconAudioEnabled = on
+        if (on && !_iconAudioLoopStarted) {
+            // Start the periodic send loop once; the flag check inside keeps
+            // it inert whenever icon audio is later disabled.
+            _iconAudioLoopStarted = true
+            loops.everyInterval(I2C_TIME_INTERVAL, function () {
+                if (_iconAudioEnabled && StopI2CScreen == 0) {
+                    sendIconBuffer()
+                }
+            })
+        }
+    }
 
     /**
      * Get the temperature from a remote micro:bit.

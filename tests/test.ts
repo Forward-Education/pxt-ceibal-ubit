@@ -3,6 +3,7 @@
 //  showAndPlayText(message: string): void
 //  showAndPlayNumber(message: number): void
 //  playText(message: string): void
+//  enableIconAudio(on: boolean): void
 //  connectWifi(wifi: string, password: string): void
 //  temperature(): number
 //  lightLevel(): number
@@ -16,6 +17,8 @@
 ceibalUbit.showAndPlayText("hello")
 ceibalUbit.showAndPlayNumber(42)
 ceibalUbit.playText("world")
+ceibalUbit.enableIconAudio(true)
+ceibalUbit.enableIconAudio(false)
 
 // WiFi
 ceibalUbit.connectWifi("my-network", "my-password")
