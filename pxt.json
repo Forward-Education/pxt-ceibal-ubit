@@ -1,6 +1,6 @@
 {
     "name": "ceibal-ubit",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "description": "This extension supports ubit, an accessibility device for the micro:bit.",
     "license": "MIT",
     "dependencies": {
@@ -10,7 +10,9 @@
     },
     "files": [
         "README.md",
-        "ubit.ts"
+        "ubit.ts",
+        "_locales/es/ceibal-ubit-strings.json",
+        "_locales/es/ceibal-ubit-jsdoc-strings.json"
     ],
     "testFiles": [
         "tests/test.ts"

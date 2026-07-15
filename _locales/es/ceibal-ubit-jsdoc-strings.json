@@ -1,0 +1,22 @@
+{
+    "ceibalUbit.showAndPlayText": "Reproduce el texto por audio en la UBit y lo muestra en la pantalla de la micro:bit.",
+    "ceibalUbit.showAndPlayText|param|message": "el texto a mostrar y reproducir",
+    "ceibalUbit.showAndPlayNumber": "Reproduce el número por audio en la UBit y lo muestra en la pantalla de la micro:bit.",
+    "ceibalUbit.showAndPlayNumber|param|message": "el número a mostrar y reproducir",
+    "ceibalUbit.playText": "Reproduce el texto escrito por audio en la UBit.",
+    "ceibalUbit.playText|param|message": "el texto a reproducir",
+    "ceibalUbit.connectWifi": "Conecta la UBit a la red WiFi indicada.",
+    "ceibalUbit.connectWifi|param|wifi": "el nombre de la red WiFi",
+    "ceibalUbit.connectWifi|param|password": "la contraseña de la red WiFi",
+    "ceibalUbit.enableIconAudio": "Habilita o deshabilita la salida por audio de los iconos que se muestran en la pantalla de la micro:bit.",
+    "ceibalUbit.enableIconAudio|param|on": "si los iconos se anuncian por audio",
+    "ceibalUbit.temperature": "Obtiene la temperatura desde una micro:bit externa. Requiere una conexión remota establecida con los bloques de usar y compartir sensores.",
+    "ceibalUbit.lightLevel": "Obtiene el nivel de luz desde una micro:bit externa. Requiere una conexión remota establecida con los bloques de usar y compartir sensores.",
+    "ceibalUbit.soundLevel": "Obtiene el nivel de sonido desde una micro:bit externa. Requiere una conexión remota establecida con los bloques de usar y compartir sensores.",
+    "ceibalUbit.direction": "Obtiene la dirección de la brújula desde una micro:bit externa. Requiere una conexión remota establecida con los bloques de usar y compartir sensores.",
+    "ceibalUbit.setupExternalSensors": "Configura el grupo de radio para recibir datos de sensores de una micro:bit externa.",
+    "ceibalUbit.setupExternalSensors|param|channel": "el grupo de radio",
+    "ceibalUbit.onGestureReceived": "Ejecuta una acción cuando la micro:bit externa detecta el gesto indicado.",
+    "ceibalUbit.shareSensorsWithUBit": "Comparte los sensores de esta micro:bit con la UBit por el grupo de radio elegido.",
+    "ceibalUbit.shareSensorsWithUBit|param|channel": "el grupo de radio"
+}

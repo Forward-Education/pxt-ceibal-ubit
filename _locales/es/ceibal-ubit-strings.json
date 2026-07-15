@@ -1,0 +1,16 @@
+{
+    "ceibalUbit.showAndPlayText|block": "mostrar cadena $message con audio",
+    "ceibalUbit.showAndPlayNumber|block": "mostrar número $message con audio",
+    "ceibalUbit.playText|block": "reproducir $message por audio",
+    "ceibalUbit.connectWifi|block": "conectarse a la red $wifi con la contraseña $password",
+    "ceibalUbit.enableIconAudio|block": "activar iconos con audio $on",
+    "ceibalUbit.temperature|block": "temperatura (°C) de micro:bit externa",
+    "ceibalUbit.lightLevel|block": "nivel de luz de micro:bit externa",
+    "ceibalUbit.soundLevel|block": "nivel de sonido de micro:bit externa",
+    "ceibalUbit.direction|block": "dirección de la brújula de micro:bit externa",
+    "ceibalUbit.setupExternalSensors|block": "usar sensores de micro:bit externa en el grupo de radio $channel",
+    "ceibalUbit.onGestureReceived|block": "cuando la micro:bit externa sea $gesture",
+    "ceibalUbit.shareSensorsWithUBit|block": "compartir sensores con UBit en el grupo de radio $channel",
+    "ceibalUbit|block": "UBit",
+    "{id:category}ceibalUbit": "UBit"
+}
