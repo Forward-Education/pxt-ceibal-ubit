@@ -1,6 +1,6 @@
 {
     "name": "ceibal-ubit",
-    "version": "1.0.4",
+    "version": "1.1.0",
     "description": "This extension supports ubit, an accessibility device for the micro:bit.",
     "license": "MIT",
     "dependencies": {

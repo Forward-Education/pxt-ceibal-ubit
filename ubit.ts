@@ -31,6 +31,7 @@ namespace ceibalUbit {
 
     let newLedMatrix = pins.createBuffer(25)
     let lastLedMatrix = pins.createBuffer(25)
+    let lastSentMatrix = pins.createBuffer(25)
 
     let _iconAudioEnabled = false // Whether icons on the display are announced via audio
     let _iconAudioLoopStarted = false // Guards against starting the send loop twice
@@ -93,46 +94,34 @@ namespace ceibalUbit {
         return copy
     }
 
-    function isAllZero(buffer: Buffer) {
-        // Iterates through the buffer and returns true if all values are 0
-        for (let i = 0; i < buffer.length; i++) {
-            if (buffer[i] !== 0) {
-                return false // If a non-zero value is found, return false
-            }
-        }
-        return true // If all values are 0, return true
-    }
-
-    // Transforms the string to buffer, pads it, and sends it to the UBit.
-    // Ensures the first character is # as it is an icon.
-    function sendIconBuffer() {
-        let LedMatrix = pins.createBuffer(25)
-        let buffer2 = pins.createBuffer(BUFF_LEN)
-
+    // Reads the current 5x5 display state into a 25-byte buffer
+    function readDisplayFrame(): Buffer {
+        let frame = pins.createBuffer(25)
         for (let i = 0; i <= 24; i++) {
             row = Math.floor(i / 5)
             col = i % 5
-            LedMatrix.setNumber(
+            frame.setNumber(
                 NumberFormat.UInt8LE,
                 i,
                 led.point(row, col) ? 1 : 0,
             )
         }
+        return frame
+    }
 
-        if (!LedMatrix.equals(lastLedMatrix) || isAllZero(LedMatrix)) {
-            lastLedMatrix = copyBuffer(LedMatrix)
-            return
-        }
+    // Sends a 25-byte display frame to the UBit, marked with '#' as an icon
+    function sendMatrixPacket(frame: Buffer) {
+        let buffer2 = pins.createBuffer(BUFF_LEN)
 
         // Place '#' at the first position
         buffer2.setNumber(NumberFormat.UInt8LE, 0, "#".charCodeAt(0))
 
-        // Copy the 25-byte matrixBuffer into buffer2, shifting to the right
+        // Copy the 25-byte frame into buffer2, shifting to the right
         for (let i = 0; i < 25; i++) {
             buffer2.setNumber(
                 NumberFormat.UInt8LE,
                 i + 1,
-                LedMatrix.getNumber(NumberFormat.UInt8LE, i),
+                frame.getNumber(NumberFormat.UInt8LE, i),
             )
         }
 
@@ -143,6 +132,41 @@ namespace ceibalUbit {
 
         // Send the buffer via I2C
         pins.i2cWriteBuffer(7, buffer2, false)
+    }
+
+    // Reports the display to the UBit whenever the visible frame changes.
+    // Each stable frame is sent exactly once (the old version re-sent the
+    // same icon every 500 ms forever, flooding the UBit and causing looping
+    // audio and lost text messages).
+    function sendIconBuffer() {
+        let LedMatrix = readDisplayFrame()
+
+        if (!LedMatrix.equals(lastLedMatrix)) {
+            // The frame just changed; wait one interval for it to stabilize
+            // (an animation or scroll produces a different frame each tick).
+            lastLedMatrix = copyBuffer(LedMatrix)
+            return
+        }
+
+        if (LedMatrix.equals(lastSentMatrix)) {
+            return // this frame was already reported
+        }
+        lastSentMatrix = copyBuffer(LedMatrix)
+
+        // All-zero frames are reported too: they tell the UBit the display
+        // was cleared, so showing the same icon again is announced again.
+        sendMatrixPacket(LedMatrix)
+    }
+
+    // Records the current display frame as already reported and resets the
+    // UBit's icon state. Used by the show-with-audio blocks: the glyph they
+    // leave on screen (e.g. the digit of "show number 2") was already spoken
+    // via the TTS path and must not be announced a second time by the icon
+    // loop.
+    function markDisplayAnnounced() {
+        lastLedMatrix = readDisplayFrame()
+        lastSentMatrix = copyBuffer(lastLedMatrix)
+        sendMatrixPacket(pins.createBuffer(25))
     }
 
     // Function to handle different messages
@@ -171,6 +195,9 @@ namespace ceibalUbit {
         StopI2CScreen = 1
         sendTextBuffer(message)
         basic.showString(message)
+        if (_iconAudioEnabled) {
+            markDisplayAnnounced()
+        }
         StopI2CScreen = 0
     }
 
@@ -185,6 +212,9 @@ namespace ceibalUbit {
         StopI2CScreen = 1
         sendTextBuffer(textString)
         basic.showString(textString)
+        if (_iconAudioEnabled) {
+            markDisplayAnnounced()
+        }
         StopI2CScreen = 0
     }
 
