@@ -109,12 +109,14 @@ namespace ceibalUbit {
         return frame
     }
 
-    // Sends a 25-byte display frame to the UBit, marked with '#' as an icon
-    function sendMatrixPacket(frame: Buffer) {
+    // Sends a 25-byte display frame to the UBit. Marker '#' = normal icon
+    // report (announced once per change); '@' = forced re-announcement
+    // (played even if it was already announced).
+    function sendMatrixPacket(frame: Buffer, marker: string) {
         let buffer2 = pins.createBuffer(BUFF_LEN)
 
-        // Place '#' at the first position
-        buffer2.setNumber(NumberFormat.UInt8LE, 0, "#".charCodeAt(0))
+        // Place the marker at the first position
+        buffer2.setNumber(NumberFormat.UInt8LE, 0, marker.charCodeAt(0))
 
         // Copy the 25-byte frame into buffer2, shifting to the right
         for (let i = 0; i < 25; i++) {
@@ -155,7 +157,7 @@ namespace ceibalUbit {
 
         // All-zero frames are reported too: they tell the UBit the display
         // was cleared, so showing the same icon again is announced again.
-        sendMatrixPacket(LedMatrix)
+        sendMatrixPacket(LedMatrix, "#")
     }
 
     // Records the current display frame as already reported and resets the
@@ -166,7 +168,7 @@ namespace ceibalUbit {
     function markDisplayAnnounced() {
         lastLedMatrix = readDisplayFrame()
         lastSentMatrix = copyBuffer(lastLedMatrix)
-        sendMatrixPacket(pins.createBuffer(25))
+        sendMatrixPacket(pins.createBuffer(25), "#")
     }
 
     // Function to handle different messages
@@ -254,7 +256,19 @@ namespace ceibalUbit {
     //% on.shadow="toggleOnOff"
     //% blockId=ceibal_ubit_icon_audio
     export function enableIconAudio(on: boolean): void {
+        let wasEnabled = _iconAudioEnabled
         _iconAudioEnabled = on
+        if (on && !wasEnabled) {
+            // Turning icon audio on announces whatever is on the display
+            // right now, even if it was announced before (Ceibal option 1).
+            // The '@' marker tells the UBit to bypass its once-per-frame
+            // dedupe; an all-zero frame is ignored there, so a blank screen
+            // announces nothing.
+            let frame = readDisplayFrame()
+            lastLedMatrix = copyBuffer(frame)
+            lastSentMatrix = copyBuffer(frame)
+            sendMatrixPacket(frame, "@")
+        }
         if (on && !_iconAudioLoopStarted) {
             // Start the periodic send loop once; the flag check inside keeps
             // it inert whenever icon audio is later disabled.
