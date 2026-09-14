@@ -36,6 +36,44 @@ namespace ceibalUbit {
     let _iconAudioEnabled = false // Whether icons on the display are announced via audio
     let _iconAudioLoopStarted = false // Guards against starting the send loop twice
 
+    // Last message shown by a show-with-audio block and the display frame it
+    // left behind. While that exact frame is still on the screen, repeating
+    // the same block (typical "forever" loop) is a no-op: the screen has not
+    // changed, so nothing is re-announced (Ceibal "Option 1" semantics).
+    let _lastShownText = ""
+    let _lastShownFrame: Buffer = null
+
+    function isAllZero(frame: Buffer): boolean {
+        for (let i = 0; i < frame.length; i++) {
+            if (frame.getNumber(NumberFormat.UInt8LE, i) != 0) return false
+        }
+        return true
+    }
+
+    // True when `message` was the last thing shown with audio and its glyph
+    // is still on the display unchanged (a static digit or single letter).
+    // Scrolled text clears the screen when it finishes, and any other block
+    // that draws on the display changes the frame, so both fall through and
+    // are announced again - exactly when the screen changed.
+    function stillShowing(message: string): boolean {
+        if (_lastShownFrame == null || message != _lastShownText) return false
+        let frame = readDisplayFrame()
+        return !isAllZero(frame) && frame.equals(_lastShownFrame)
+    }
+
+    function showWithAudio(message: string): void {
+        if (stillShowing(message)) return
+        StopI2CScreen = 1
+        sendTextBuffer(message)
+        basic.showString(message)
+        if (_iconAudioEnabled) {
+            markDisplayAnnounced()
+        }
+        _lastShownText = message
+        _lastShownFrame = readDisplayFrame()
+        StopI2CScreen = 0
+    }
+
     // Padding function
     function padEnd(message: string, length: number, char: string) {
         while (message.length < length) {
@@ -194,13 +232,7 @@ namespace ceibalUbit {
     //% message.shadow="text"
     //% blockId=ceibal_ubit_show_and_play_text
     export function showAndPlayText(message: string): void {
-        StopI2CScreen = 1
-        sendTextBuffer(message)
-        basic.showString(message)
-        if (_iconAudioEnabled) {
-            markDisplayAnnounced()
-        }
-        StopI2CScreen = 0
+        showWithAudio(message)
     }
 
     /**
@@ -210,14 +242,7 @@ namespace ceibalUbit {
     //% block="show number $message with audio"
     //% blockId=ceibal_ubit_show_and_play_number
     export function showAndPlayNumber(message: number): void {
-        let textString = message.toString()
-        StopI2CScreen = 1
-        sendTextBuffer(textString)
-        basic.showString(textString)
-        if (_iconAudioEnabled) {
-            markDisplayAnnounced()
-        }
-        StopI2CScreen = 0
+        showWithAudio(message.toString())
     }
 
     /**
@@ -231,6 +256,63 @@ namespace ceibalUbit {
         StopI2CScreen = 1
         sendTextBuffer(message)
         StopI2CScreen = 0
+    }
+
+    // Sends a settings packet: '$' + kind + value (0..100)
+    function sendSettingBuffer(kind: string, value: number) {
+        // 0..100 are values; 101 (volume only) means "follow the wheel again"
+        let v = Math.constrain(Math.round(value), 0, 101)
+        let message = "$" + kind + v.toString()
+        message = padEnd(message, BUFF_LEN, " ")
+        let buffer2 = pins.createBuffer(BUFF_LEN)
+        for (let i = 0; i < BUFF_LEN; i++) {
+            buffer2.setNumber(NumberFormat.UInt8LE, i, message.charCodeAt(i))
+        }
+        pins.i2cWriteBuffer(7, buffer2, false)
+    }
+
+    /**
+     * Sets the UBit volume (0-100). Moving the volume wheel cancels it.
+     * @param percent volume from 0 (mute) to 100 (maximum)
+     */
+    //% block="set UBit volume to $percent \\%"
+    //% percent.min=0 percent.max=100 percent.defl=50
+    //% blockId=ceibal_ubit_set_volume
+    export function setVolume(percent: number): void {
+        sendSettingBuffer("V", percent)
+    }
+
+    /**
+     * Releases a "set volume" override so the volume wheel is in control again.
+     */
+    //% block="UBit volume follows the wheel"
+    //% blockId=ceibal_ubit_volume_follow_wheel
+    export function volumeFollowWheel(): void {
+        sendSettingBuffer("V", 101)
+    }
+
+    /**
+     * Sets the maximum volume the UBit will ever play (10-100). Saved on the UBit.
+     * @param percent maximum volume
+     */
+    //% block="set UBit maximum volume to $percent \\%"
+    //% percent.min=0 percent.max=100 percent.defl=100
+    //% blockId=ceibal_ubit_set_max_volume
+    //% advanced=true
+    export function setMaxVolume(percent: number): void {
+        sendSettingBuffer("M", percent)
+    }
+
+    /**
+     * Sets the touch-button sensitivity of the UBit (0-100). Saved on the UBit.
+     * @param percent sensitivity
+     */
+    //% block="set UBit touch sensitivity to $percent \\%"
+    //% percent.min=0 percent.max=100 percent.defl=50
+    //% blockId=ceibal_ubit_set_sensitivity
+    //% advanced=true
+    export function setSensitivity(percent: number): void {
+        sendSettingBuffer("S", percent)
     }
 
     /**
