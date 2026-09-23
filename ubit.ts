@@ -64,14 +64,32 @@ namespace ceibalUbit {
     function showWithAudio(message: string): void {
         if (stillShowing(message)) return
         StopI2CScreen = 1
+        flushPendingIcon()
         sendTextBuffer(message)
         basic.showString(message)
-        if (_iconAudioEnabled) {
-            markDisplayAnnounced()
-        }
+        // Always tell the UBit what the block left on the display (the '='
+        // tracked frame, or a clear after a scroll) - even when icon audio is
+        // off - so it can re-announce the screen when audio is switched on.
+        markDisplayAnnounced()
         _lastShownText = message
         _lastShownFrame = readDisplayFrame()
         StopI2CScreen = 0
+    }
+
+    // Reports the frame currently on the display if it has not been sent
+    // yet. The icon loop needs a frame to sit unchanged for two ticks (1 s)
+    // before it reports it, so an icon shown briefly right before a
+    // with-audio block ("show icon", then "show string ... with audio") was
+    // never sent and never spoken. The block that is about to replace the
+    // display knows the frame is final, so it flushes it first; the UBit
+    // then plays the icon prompt and speaks the text after it.
+    function flushPendingIcon() {
+        if (!_iconAudioEnabled) return
+        let frame = readDisplayFrame()
+        if (isAllZero(frame) || frame.equals(lastSentMatrix)) return
+        lastLedMatrix = copyBuffer(frame)
+        lastSentMatrix = copyBuffer(frame)
+        sendMatrixPacket(frame, "#")
     }
 
     // Padding function
@@ -206,7 +224,19 @@ namespace ceibalUbit {
     function markDisplayAnnounced() {
         lastLedMatrix = readDisplayFrame()
         lastSentMatrix = copyBuffer(lastLedMatrix)
-        sendMatrixPacket(pins.createBuffer(25), "#")
+        if (isAllZero(lastLedMatrix)) {
+            // Nothing left on screen (scrolled text has finished): a normal
+            // clear report, understood by every firmware version.
+            sendMatrixPacket(lastLedMatrix, "#")
+        } else {
+            // '=' = "this frame is on the display and has already been
+            // spoken": the UBit remembers it silently, so switching screen
+            // audio on later can re-announce it (Ceibal option 1). The old
+            // code sent an all-zero frame here, which made the UBit believe
+            // the display was blank - the re-announce then said nothing.
+            // Firmware before 2026-09 ignores '=' (no double audio either).
+            sendMatrixPacket(lastLedMatrix, "=")
+        }
     }
 
     // Function to handle different messages
@@ -254,7 +284,12 @@ namespace ceibalUbit {
     //% blockId=ceibal_ubit_play_text
     export function playText(message: string): void {
         StopI2CScreen = 1
+        flushPendingIcon()
         sendTextBuffer(message)
+        // This block does not touch the display, so the UBit must keep the
+        // *screen* as what gets re-announced on an audio toggle, not this
+        // text: re-report the current frame as tracked ('=') or cleared.
+        markDisplayAnnounced()
         StopI2CScreen = 0
     }
 
